@@ -6,41 +6,6 @@ import (
 	"time"
 )
 
-func addNumber(numberList chan<- int, repeticoes int, carga int) {
-	var i = 1
-	for r := 1; r < repeticoes; r++ {
-		for j := 1; j <= carga; j++ {
-			numberList <- i
-			i = i + 1
-		}
-		println("Adicionado ao canal mais ", carga, " arquivos")
-		time.Sleep(20 * time.Second) // Simula tempo de processamento
-	}
-	println(i)
-	close(numberList)
-	fmt.Println("Finalizado de adicionar arquivo", i)
-}
-
-func sendToAws(files <-chan GetArquivo, filesProcessed chan<- GetArquivo, wg *sync.WaitGroup) {
-	defer wg.Done()
-	for v := range files {
-		err := sendDataS3(v)
-		if err != nil {
-			continue
-		}
-		filesProcessed <- v
-	}
-}
-
-func processComplete(filesProcessed <-chan int, filesCompleted chan<- int, wg *sync.WaitGroup) {
-	defer wg.Done()
-	for v := range filesProcessed {
-		fmt.Println(" > Atualizando arquivo no BD do Sync:", v)
-		filesCompleted <- v
-		time.Sleep(600 * time.Millisecond)
-	}
-}
-
 func getFiles(filesList chan<- GetArquivo) {
 	date := time.Now()
 	for {
@@ -58,6 +23,31 @@ func getFiles(filesList chan<- GetArquivo) {
 			var arquivo GetArquivo
 			rows.Scan(&arquivo.Binario, &arquivo.MimeType, &arquivo.Hash)
 			filesList <- arquivo
+			return
 		}
+	}
+}
+
+func sendToAws(files <-chan GetArquivo, filesProcessed chan<- GetArquivo, wg *sync.WaitGroup) {
+	defer wg.Done()
+	for v := range files {
+		println("Enviando arquivo para o S3:", v.Hash)
+		err := sendDataS3(v)
+		if err != nil {
+			continue
+		}
+		filesProcessed <- v
+	}
+}
+
+func updateFilesBd(filesProcessed <-chan GetArquivo, filesCompleted chan<- string, wg *sync.WaitGroup) {
+	defer wg.Done()
+	for v := range filesProcessed {
+		updated := updateArquivo(v.Hash)
+		if updated != nil {
+			fmt.Print("Erro ao atualizar arquivo pno BD:", updated)
+			continue
+		}
+		filesCompleted <- v.Hash
 	}
 }

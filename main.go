@@ -18,39 +18,34 @@ func main() {
 	var wg sync.WaitGroup
 	var wg2 sync.WaitGroup
 	files := make(chan GetArquivo, 100000)
-	filesProcessed := make(chan GetArquivo, 100000)
-	filesCompleted := make(chan GetArquivo, 100000)
+	filesInAws := make(chan GetArquivo, 100000)
+	filesCompleted := make(chan string, 100000)
 
 	connectDb()
+	connectAws()
 
-	// go addNumber(files, 100, 250) // Simula select no banco de dados
 	go getFiles(files)
+
 	for worker := 0; worker < runtime.GOMAXPROCS(0); worker++ {
 		wg.Add(1)
-		go sendToAws(files, filesProcessed, &wg)
+		go sendToAws(files, filesInAws, &wg)
 	}
 	go func() {
 		wg.Wait()
-		close(filesProcessed)
-	}
-	for worker := 0; worker < runtime.GOMAXPROCS(0); worker++ {
-		wg.Add(1)
-		go processComplete(filesProcessed, filesCompleted, &wg2)
-	}
-	go func(){
-		wg2.Wait()
-		close(filesCompleted)
-	}
-	// go func() {
-	// 	wg.Wait()
-	// 	close(filesProcessed)
-	// 	close(filesCompleted)
-	// }()
-	go func() {
-		for v := range files {
-			fmt.Println(v.Hash)
-		}
+		close(filesInAws)
 	}()
 
+	for worker := 0; worker < runtime.GOMAXPROCS(0); worker++ {
+		wg2.Add(1)
+		go updateFilesBd(filesInAws, filesCompleted, &wg2)
+	}
+	go func() {
+		wg2.Wait()
+		close(filesCompleted)
+	}()
+
+	for v := range filesCompleted {
+		fmt.Println("Arquivo migrado com sucesso: " + v)
+	}
 	fmt.Println("Fim: ", time.Since(start))
 }

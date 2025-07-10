@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"os"
 
 	"github.com/jackc/pgx/v5"
@@ -23,7 +24,7 @@ func getEnv(key, defaultValue string) string {
 }
 
 func connectDb() *Database {
-	conn, err := pgxpool.New(context.Background(), getEnv("", ""))
+	conn, err := pgxpool.New(context.Background(), getEnv("DATABASE_UR", ""))
 	if err != nil {
 		panic("Erro ao conectar ao banco de dados: " + err.Error())
 	}
@@ -32,20 +33,6 @@ func connectDb() *Database {
 	return connectionDb
 }
 
-// func selectArquivos(date string) (pgx.Rows, error) {
-//     // Removido a linha que sobrescrevia o parâmetro
-//     // date = "2022-08-18"
-
-//     // Corrigido BEETWEN para BETWEEN e a sintaxe
-//     sql := "SELECT * FROM Arquivo WHERE data_coluna BETWEEN '" + date + " 00:00:00' AND '" + date + " 23:59:59.999999'"
-//     println(sql)
-//     rows, err := connectionDb.Conn.Query(context.Background(), sql)
-//     if err != nil {
-//         return nil, err
-//     }
-//     return rows, nil
-// }
-
 func selectArquivos(date string) (pgx.Rows, error) {
 	rows, err := connectionDb.Conn.Query(context.Background(), "SELECT \"Binario\",\"MimeType\", \"Hash\" FROM \"Arquivo\" WHERE \"DataCadastro\" BETWEEN '"+date+" 00:00:00' AND '"+date+" 23:59:59.999999' AND \"UrlAws\" IS NULL")
 	if err != nil {
@@ -53,10 +40,35 @@ func selectArquivos(date string) (pgx.Rows, error) {
 	}
 	return rows, nil
 }
-func updateArquivo(idArquivo string, bucketAws string, regionAws string, endPointAws string) (pgx.Rows, error) {
-	rows, err := connectionDb.Conn.Query(context.Background(), "SELECT * FROM Arquivo LIMIT 250")
+func updateArquivo(hash string) error {
+	// CORREÇÃO: Usar parâmetros preparados e Exec
+	sql := `UPDATE "Arquivo" 
+            SET "BucketAws" = $1, 
+                "RegionAws" = $2, 
+                "EndPointAws" = $3, 
+                "UrlAws" = $4,
+                "DataAlteracao" = CURRENT_TIMESTAMP
+            WHERE "Hash" = $5`
+
+	bucketAws := "sync-legado"
+	regionAws := "us-east-1"
+	endPointAws := "amazonaws.com"
+	urlAws := "https://sync-legado.s3.amazonaws.com/" + hash
+
+	// Usar Exec para UPDATE, não Query
+	result, err := connectionDb.Conn.Exec(context.Background(), sql,
+		bucketAws, regionAws, endPointAws, urlAws, hash)
+
 	if err != nil {
-		return nil, err
+		return fmt.Errorf("erro ao atualizar arquivo %s: %w", hash, err)
 	}
-	return rows, nil
+
+	// Verificar se alguma linha foi atualizada
+	rowsAffected := result.RowsAffected()
+	if rowsAffected == 0 {
+		return fmt.Errorf("nenhuma linha atualizada para hash: %s", hash)
+	}
+
+	fmt.Printf("Arquivo %s atualizado com sucesso (%d linhas)\n", hash, rowsAffected)
+	return nil
 }
