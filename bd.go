@@ -24,7 +24,7 @@ func getEnv(key, defaultValue string) string {
 }
 
 func connectDb() *Database {
-	conn, err := pgxpool.New(context.Background(), getEnv("DATABASE_UR", ""))
+	conn, err := pgxpool.New(context.Background(), getEnv("DATABASE_UR", "postgres://postgres:prixpto@189.28.180.37:32768/arquivo"))
 	if err != nil {
 		panic("Erro ao conectar ao banco de dados: " + err.Error())
 	}

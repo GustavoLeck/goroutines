@@ -19,8 +19,6 @@ var (
 
 func connectAws() *s3.Client {
 	awsOnce.Do(func() {
-		fmt.Println("Inicializando conexão com AWS S3...")
-
 		cfg, err := config.LoadDefaultConfig(context.TODO(),
 			config.WithRegion("us-east-1"),
 			config.WithRetryMaxAttempts(3),

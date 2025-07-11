@@ -1,7 +1,25 @@
 {
-    // Use o IntelliSense para saber mais sobre os atributos possíveis.
-    // Focalizar para exibir as descrições dos atributos existentes.
-    // Para obter mais informações, acesse: https://go.microsoft.com/fwlink/?linkid=830387
-    "version": "0.2.0",
-    "configurations": []
+  "version": "0.2.0",
+  "configurations": [
+    {
+        "name": "Attach to Process",
+        "type": "go",
+        "request": "attach",
+        "mode": "local",
+        "processId": 0
+    },
+    {
+      "name": "Debug Go Program",
+      "type": "go",
+      "request": "launch",
+      "mode": "debug",
+      "program": "${workspaceFolder}",
+      "args": [],
+      "showLog": true,
+      "stopOnEntry": false,
+      "cwd": "${workspaceFolder}",
+      "console": "integratedTerminal",
+      "dlvFlags": ["--listen=:2345", "--headless=true", "--api-version=2", "--accept-multiclient"]
+    }
+  ]
 }
